@@ -22,7 +22,7 @@ class TestUFuzzy(unittest.TestCase):
         expected_str = str(expected_str).strip().lower()
         actual_str = str(actual_str).strip().lower()
         self.assertEqual(expected_str, actual_str, msg)
-        
+    
     def test_search(self):
         data = get_data()
         haystack = data.get('steam_games_47000', [])
@@ -75,6 +75,34 @@ class TestUFuzzy(unittest.TestCase):
             (82, "Super Cuber"),
             (233, "Super Toy Cars"),
             (405, "Rocksmith 2014 - Jane's Addiction - Superhero"),
+        ]
+        for i, expected in enumerate(expected_results):
+            if isinstance(expected, tuple):
+                ri, expected = expected
+            else:
+                ri = i
+            if expected is None or expected == '*':
+                continue
+            self.assertStrEq(expected, results[ri], f"bad result at row {i}, expected \"{expected}\"")
+         
+    def test_search_issue56(self):
+        # ref https://github.com/leeoniya/uFuzzy/issues/56
+        data = get_data()
+        haystack = data.get('steam_games_47000', [])
+        options = uFuzzy.Options()
+        options.intraChars = '.'
+        options.interChars = '.'
+        uf = uFuzzy.uFuzzy(options)
+
+        # ref https://leeoniya.github.io/uFuzzy/demos/compare.html?libs=uFuzzy&outOfOrder&search=spac%20ca%20-)&intraChars=.
+        needle = "spac ca -)"
+        results = uf.search_simple(haystack, needle, outOfOrder=True)
+        self.assertEqual(34, len(results))
+        expected_results = [
+            "Space Cat",
+            "Call of Duty: Ghosts - Space Cats Personalization Pack",
+            "Fractured Space - Cadet Pack",
+            "Fractured Space - Captain Pack",
         ]
         for i, expected in enumerate(expected_results):
             if isinstance(expected, tuple):

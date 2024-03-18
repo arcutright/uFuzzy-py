@@ -56,6 +56,24 @@ def escapeRegExp(str):
 # meh, magic tmp placeholder, must be tolerant to toLocaleLowerCase(), interSplit, and intraSplit
 EXACT_HERE = 'eexxaacctt'
 
+def get_unicode_punctuation_chars():
+    punct_chars = list("!\"#$%&'()*+,-./:;<=>?@[]\\^_`{|}~")
+    for char in map(chr, range(0x110000)):
+        if unicodedata.category(char).startswith('P') and char not in punct_chars:
+            punct_chars.append(char)
+    return punct_chars
+
+def get_unicode_punctuation_regex():
+    punct_chars = get_unicode_punctuation_chars()
+    punct_chars_str = ''.join([re.escape(c) for c in punct_chars])
+    return re.compile(f"[{punct_chars_str}]+", re.UNICODE)
+
+# unicode punctuation regex
+# const PUNCT_RE = /\p{P}/gu;
+# PUNCT_RE = regex.compile(r"\p{P}", re.UNICODE) # pip install regex
+# PUNCT_RE = re.compile(r"[!\"#$%&\'\(\)\*\+,\-\./:;<=>?@\[\]\\^_`{\|}~]", re.UNICODE) # estimate
+PUNCT_RE = get_unicode_punctuation_regex()
+
 LATIN_UPPER: PartialRegExp = 'A-Z'
 LATIN_LOWER: PartialRegExp = 'a-z'
 
@@ -87,6 +105,8 @@ class Options:
         self.interSplit: PartialRegExp = r"[^A-Za-z\d']+"
         self.intraSplit: PartialRegExp | None = r"[a-z][A-Z]"
 
+        self.interBound: PartialRegExp | None = r"[^A-Za-z\d]"
+        """inter bounds that will be used to increase lft2/rgt2 info counters"""
         self.intraBound: PartialRegExp | None = r"[A-Za-z]\d|\d[A-Za-z]|[a-z][A-Z]"
         """intra bounds that will be used to increase lft1/rgt1 info counters"""
 
@@ -214,7 +234,6 @@ def lazyRepeat(chars: str, limit: int | None) -> PartialRegExp:
 
 mode2Tpl: PartialRegExp = r"(?:\b|_)"
 
-# @dataclass #(slots=True)
 @dataclass_slots
 class Info:
     # https://github.com/leeoniya/uFuzzy/blob/1.0.14/dist/uFuzzy.d.ts#L162
@@ -271,6 +290,7 @@ class uFuzzy:
         self._intraSplit = opts.intraSplit or ''
         self._interSplit = opts.interSplit or ''
         self._intraBound = opts.intraBound or ''
+        self._interBound = opts.interBound or ''
         self.intraChars = opts.intraChars
 
         # self.alpha = opts.letters or opts.alpha
@@ -282,6 +302,7 @@ class uFuzzy:
             self._interSplit = swapAlpha(self._interSplit, upper, lower)
             self._intraSplit = swapAlpha(self._intraSplit, upper, lower)
             self._intraBound = swapAlpha(self._intraBound, upper, lower)
+            self._interBound = swapAlpha(self._interBound, upper, lower)
             self.intraChars = swapAlpha(self.intraChars, upper, lower)
             self.intraContr = swapAlpha(self.intraContr, upper, lower)
         
@@ -306,7 +327,7 @@ class uFuzzy:
 
         # https://github.com/leeoniya/uFuzzy/blob/1.0.14/src/uFuzzy.js#L399
         self.withIntraBound = bool(self._intraBound)
-        self.interBound = re.compile(self._interSplit, uFlag)
+        self.interBound = re.compile(self._interBound, uFlag)
         self.intraBound = re.compile(self._intraBound, uFlag)
 
     # https://github.com/leeoniya/uFuzzy/blob/1.0.14/src/uFuzzy.js#L208
@@ -788,7 +809,10 @@ class uFuzzy:
             neg = (m.group(0) or '').strip()[1:]
             if neg[0] == '"':
                 neg = escapeRegExp(neg[1:-1])
-            negs.append(neg)
+            else:
+                neg = PUNCT_RE.sub('', neg)
+            if neg:
+                negs.append(neg)
             return ''
         needle = re.sub(self.NEGS_RE, repl, needle)
 
