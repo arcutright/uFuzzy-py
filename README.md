@@ -1,3 +1,46 @@
+## uFuzzy-py
+
+This is a port of [uFuzzy 1.0.14](https://github.com/leeoniya/uFuzzy/tree/1.0.14). It probably has bugs, but the basic functions seem to be working.
+
+Tested on
+- cPython 3.7 - 3.12
+
+### python API
+
+```py
+import uFuzzy
+
+# set up uFuzzy
+options = uFuzzy.Options()
+uf = uFuzzy.uFuzzy(options)
+
+# load / create some haystack
+with open('test/testdata.json', encoding='utf-8') as file:
+    data = json.load(file)
+haystack = data.get('steam_games_47000', [])
+
+needle = "super ma"
+
+# search with simple API
+results = uf.search_simple(haystack, needle)
+
+# search with js API (useful for fancy highlighting)
+#
+# uf.search() returns `SearchResult`
+#   SearchResult = FilteredResult | RankedResult | AbortedResult
+#   AbortedResult = tuple[None, None, None]
+#   FilteredResult = tuple[HaystackIdxs, None, None]
+#   RankedResult = tuple[HaystackIdxs, Info, InfoIdxOrder]
+idxs, info, order = uf.search(haystack, needle)
+results = []
+if idxs and info:
+    results = [highlight(haystack[info.idx[oi]], info.ranges[oi]) for oi in order]
+```
+
+---
+
+Original README reproduced below
+
 ## ▒ μFuzzy
 
 A tiny, efficient fuzzy search that doesn't suck.
